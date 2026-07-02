@@ -65,7 +65,7 @@ def parse_initial_structure(file: Path) -> Tuple[np.ndarray, np.ndarray]:
         
     else:
         if not CCLIB:
-            raise RuntimeError('cclib is required to parse unknown/other formats.')
+            raise RuntimeError('The cclib library is required to parse non-XYZ formats (e.g. Gaussian/ORCA logs). Please install cclib or provide an XYZ file.')
         data = cclib.io.ccread(str(file))
         coordinates = data.atomcoords[-1,::]
         atoms = np.array([ATOM_LIST[n] for n in data.atomnos])
@@ -138,7 +138,7 @@ def _parse_gaussian_log(file: Path) -> Tuple[np.ndarray, np.ndarray]:
             num_coord = num
 
     if num_coord == -1:
-        raise ValueError("Cannot find coordinates in Gaussian log.")
+        raise ValueError("Could not extract molecular coordinates from the Gaussian log file.")
 
     i = num_coord + 5
     atoms = []
@@ -192,7 +192,7 @@ def _parse_orca_log(file: Path) -> Tuple[np.ndarray, np.ndarray]:
                 break
                 
         if start_idx == -1:
-            raise ValueError("Cannot find coordinates in ORCA log.")
+            raise ValueError("Could not extract molecular coordinates from the ORCA log file.")
             
         atoms = []
         coordinates = []

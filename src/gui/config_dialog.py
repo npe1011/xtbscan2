@@ -54,7 +54,7 @@ class ConfigDialog(QDialog):
     def auto_update_param_dir(self, text):
         from pathlib import Path
         bin_path = Path(text)
-        if bin_path.parent.name.lower() == 'bin':
+        if bin_path.parent.name.lower() == 'bin' and not self.xtb_param_dir_edit.text().strip():
             param_dir = bin_path.parent.parent / "share" / "xtb"
             self.xtb_param_dir_edit.setText(str(param_dir))
 

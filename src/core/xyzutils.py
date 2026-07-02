@@ -66,7 +66,7 @@ def read_sequential_xyz_file(file: Union[str, Path]) -> Tuple[np.ndarray, np.nda
                 if line.strip() == '':
                     break
                 else:
-                    raise ValueError(str(file) + 'is not a valid xyz file.')
+                    raise ValueError(f"{file} is not a valid XYZ file.")
 
     # Read each coordinates and title
     for start_line in start_lines:

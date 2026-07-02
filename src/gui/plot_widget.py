@@ -287,6 +287,7 @@ class PlotWidget(QWidget):
         if dest_path:
             try:
                 xyzutils.save_xyz_file(dest_path, self.atoms, self.coords_list[idx], title=f"Step {self.step_spin.value()}")
+                QMessageBox.information(self, "File Saved", f"Successfully saved structure to:\n{dest_path}")
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Failed to save structure: {e}")
 

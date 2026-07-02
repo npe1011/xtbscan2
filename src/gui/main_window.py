@@ -15,7 +15,7 @@ from gui.viewer3d import Viewer3D
 from gui.tables import SettingsTablesWidget
 from gui.config_dialog import ConfigDialog
 from gui.plot_widget import PlotWidget
-from core.parsers import parse_initial_structure
+from core.parsers import parse_initial_structure, detect_file_type
 from core import xyzutils
 
 class MainWindow(QMainWindow):
@@ -260,7 +260,7 @@ class MainWindow(QMainWindow):
                 padding: 8px;
             }
         """)
-        self.log_text.append(f"Loaded: {file_path}")
+        self.log_text.append(f"Loading initial structure file: {file_path} ...")
         if hasattr(self, 'job_name_edit'):
             self.job_name_edit.setText(f"{Path(file_path).stem}_scan")
         try:
@@ -269,8 +269,23 @@ class MainWindow(QMainWindow):
             full_xyz = f"{len(atoms)}\n{Path(file_path).name}\n{xyz_str}"
             self.viewer_panel.load_xyz(full_xyz)
             self.tables_widget.set_structure(atoms, coords)
+            
+            ftype = detect_file_type(Path(file_path))
+            format_names = {
+                'xyz': 'XYZ coordinates',
+                'gaussian_log': 'Gaussian output/log',
+                'orca_log': 'ORCA output/log',
+                'gaussian_inp': 'Gaussian input',
+                'orca_inp': 'ORCA input',
+                'other': 'cclib supported structure'
+            }
+            fmt_str = format_names.get(ftype, 'Chemical structure')
+            msg = f"Successfully loaded initial structure: {Path(file_path).name} ({len(atoms)} atoms, {fmt_str})"
+            self.log_text.append(f"<span style='color:#059669'><b>{msg}</b></span>")
+            self.statusBar().showMessage(msg, 5000)
         except Exception as e:
             self.log_text.append(f"<span style='color:red'>Failed to load structure: {e}</span>")
+            QMessageBox.warning(self, "Load Error", f"Failed to load structure file:\n{e}\n\nPlease verify that the file format is valid and supported.")
             
     def load_result_file(self, file_path):
         self.is_result_loaded = True
@@ -288,7 +303,7 @@ class MainWindow(QMainWindow):
                 padding: 8px;
             }
         """)
-        self.log_text.append(f"Loaded result: {file_path}")
+        self.log_text.append(f"Loading result file: {file_path} ...")
         try:
             fp = Path(file_path)
             xyz_path = None
@@ -352,12 +367,27 @@ class MainWindow(QMainWindow):
             self.plot_widget.set_result_data(energies, saddle_flags, csv_rows, trajectory_data, file_path)
             if len(energies) > 0 or trajectory_data:
                 self.tabs.setCurrentWidget(self.plot_widget)
+
+            num_pts = len(energies)
+            has_traj = bool(trajectory_data.strip())
+            details = []
+            if num_pts > 0:
+                details.append(f"{num_pts} energy points")
+            elif len(csv_rows) > 2:
+                details.append(f"{len(csv_rows)-2} data rows")
+            if has_traj:
+                details.append("3D trajectory")
+            detail_str = f" [{', '.join(details)}]" if details else ""
+            msg = f"Successfully loaded result file: {Path(file_path).name}{detail_str}"
+            self.log_text.append(f"<span style='color:#4C1D95'><b>{msg}</b></span>")
+            self.statusBar().showMessage(msg, 5000)
         except Exception as e:
             self.log_text.append(f"<span style='color:red'>Failed to load result structure: {e}</span>")
+            QMessageBox.warning(self, "Load Error", f"Failed to load result file:\n{e}\n\nPlease verify that the file format is valid and supported.")
         
     def run_calculation(self):
         if not self.current_input_file or getattr(self, 'is_result_loaded', False):
-            QMessageBox.warning(self, "Warning", "Please load an Initial Structure before running a calculation.")
+            QMessageBox.warning(self, "Warning", "No input structure loaded.\nPlease open or drop an initial structure file (XYZ, Gaussian/ORCA log, etc.) before running a calculation.")
             return
             
         # Prepare job config
@@ -391,6 +421,7 @@ class MainWindow(QMainWindow):
         # Start QProcess
         if hasattr(self, 'process') and self.process:
             self.process.deleteLater()
+        self._user_stopped = False
         self.process = QProcess(self)
         self.process.readyReadStandardOutput.connect(self.handle_stdout)
         self.process.readyReadStandardError.connect(self.handle_stderr)
@@ -418,6 +449,7 @@ class MainWindow(QMainWindow):
 
     def stop_calculation(self):
         if self.process and self.process.state() == QProcess.ProcessState.Running:
+            self._user_stopped = True
             self.process.kill()
             self.log_text.append("\nCalculation stopped by user.")
         self.cleanup_temp_json()
@@ -441,7 +473,9 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(False)
         self.log_text.append(f"\nProcess finished with exit code {exit_code}")
         
-        if exit_code == 0 and self.current_input_file:
+        if exit_code != 0 and not getattr(self, '_user_stopped', False):
+            QMessageBox.warning(self, "Calculation Failed", f"The calculation terminated abnormally (exit code: {exit_code}).\nPlease check the Log tab for detailed error messages.")
+        elif exit_code == 0 and self.current_input_file:
             workdir = Path(self.current_input_file).parent
             job_name = self.job_name_edit.text().strip()
             if not job_name:
@@ -453,7 +487,7 @@ class MainWindow(QMainWindow):
             
             ans = QMessageBox.question(
                 self, "Calculation Finished",
-                "計算が正常に完了しました。結果ファイルをロードしますか？",
+                "The calculation completed successfully.\nWould you like to load the result file now?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes
             )
@@ -469,6 +503,7 @@ class MainWindow(QMainWindow):
                         self.load_result_file(str(opt_xyz))
                 except Exception as e:
                     self.log_text.append(f"<span style='color:red'>Failed to load result structure: {e}</span>")
+                    QMessageBox.warning(self, "Load Error", f"Failed to load result structure:\n{e}")
 
     def closeEvent(self, event):
         if hasattr(self, 'process') and self.process and self.process.state() == QProcess.ProcessState.Running:

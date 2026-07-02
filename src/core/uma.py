@@ -93,10 +93,10 @@ def get_uma_calculator(model_path: Path, device: Literal['cuda', 'cpu']):
         print("Warning: CUDA is not available or CPU-only PyTorch is installed. Automatically falling back to CPU.")
         device = 'cpu'
     model_path = str(model_path)
-    print(f'Loading {model_path} and setup uma calculator on {device}...')
+    print(f'Loading UMA model ({model_path}) and setting up calculator on {device}...')
     uma_predictor = load_predict_unit(path=model_path, device=device)
     calculator = FAIRChemCalculator(uma_predictor, task_name='omol')
-    print('Calculator is ready.')
+    print('UMA calculator initialized successfully.')
     return calculator
 
 
@@ -352,7 +352,7 @@ def prepare_ase_constrain_list_scan_concerted(scans: List[UMAScan], uma_constrai
     # Iterate with scan parameters in 1d concerted manner.
     # Scan length must be the same for all scan objects (should be checked before here).
     if len(set([s.num_step for s in scans])) > 1:
-        raise ValueError('For concerted scan, all scan steps must be the same.')
+        raise ValueError('For a concerted scan, all scan variables must have the exact same number of steps.')
     scan_step = scans[0].num_step
     for i in range(scan_step):
         ase_constrains_scan = []
@@ -408,12 +408,12 @@ def umascan(input_xyz_file: Union[str, Path],
         _scan1d(input_xyz_file, job_name, calculator, uma_params, scans[0], constrains, keep_log)
     elif concerted:
         if len(set([s.num_step for s in scans])) > 1:
-            raise ValueError('For concerted scan, all scan steps must be the same.')
+            raise ValueError('For a concerted scan, all scan variables must have the exact same number of steps.')
         _scan_concerted(input_xyz_file, job_name, calculator, uma_params, scans, constrains, keep_log)
     elif len(scans) == 2:
         _scan2d(input_xyz_file, job_name, calculator, uma_params, scans[0], scans[1], constrains, keep_log)
     else:
-        raise ValueError('Only Opt, 1D scan, 2D scan, or concerted scan is available.')
+        raise ValueError('Only Opt, 1D scan, 2D scan, or Concerted scan calculation types are supported.')
 
 
 def _opt(input_xyz_file: Path,
@@ -448,13 +448,13 @@ def _opt(input_xyz_file: Path,
         if constrains:
             atoms.set_constraint(prepare_ase_constrain_list(constrains))
             atoms.set_positions(atoms.get_positions(), apply_constraint=True)  # Omajinai
-        print('Starting LBFGS optimization.')
+        print('Starting UMA geometry optimization (LBFGS)...')
         opt = LBFGS(atoms, trajectory=trajfile, logfile=logfile)
         opt.attach(_check_stop, interval=1)
         opt.run(fmax=params.fmax, steps=params.max_cycles)
         final_energy = atoms.get_potential_energy() / Hartree
         calc_success = True
-        print('Optimization done.')
+        print('UMA geometry optimization completed.')
         del opt
         gc.collect()
         if os.path.exists(trajfile):
@@ -462,7 +462,7 @@ def _opt(input_xyz_file: Path,
                 traj = read(f'{trajfile}@0:')
                 write(trafxyzfile, traj, format='xyz')
             except Exception:
-                print('Trajectory conversion failed.')
+                print('Warning: Failed to convert optimization trajectory to XYZ format.')
                 traceback.print_exc()
         save_xyz_from_atoms(result_xyz_file, atoms, title=f'{final_energy:>20.12f}')
     except UMATerminationError:  # When user stop
@@ -518,7 +518,7 @@ def _scan1d(input_xyz_file: Path,
         scan_condition_list = prepare_ase_constrain_list_scan1d(scan, constrains)
         energy_list = []
         coordinates_list = []
-        print(f'Starting 1D scan ({scan.num_step} points)')
+        print(f'Starting UMA 1D scan ({scan.num_step} steps)...')
         for n, scan_condition in enumerate(scan_condition_list):
             try:
                 atoms.set_constraint(scan_condition)
@@ -541,11 +541,11 @@ def _scan1d(input_xyz_file: Path,
                         traj = read(f'{trajfile}@0:')
                         write(trafxyzfile, traj, format='xyz')
                     except Exception:
-                        print('Trajectory conversion failed.')
+                        print('Warning: Failed to convert optimization trajectory to XYZ format.')
                         traceback.print_exc()
                 coordinates_list.append(np.copy(atoms.positions))
                 energy_list.append(final_energy)
-                print(f'{n+1}/{scan.num_step} done.')
+                print(f'Step {n+1}/{scan.num_step} completed.')
             except UMATerminationError:  # When user stop
                 try:
                     if os.path.exists(trajfile):
@@ -645,7 +645,7 @@ def _scan2d(input_xyz_file: Path,
         energy_list_2d = []  # List[array]
         coordinates_list_2d = []  # List[array]
 
-        print(f'Starting 2D scan ({scan1.num_step} x {scan2.num_step} = {scan1.num_step*scan2.num_step} points)')
+        print(f'Starting UMA 2D scan ({scan1.num_step} x {scan2.num_step} = {scan1.num_step*scan2.num_step} total grid points)...')
         count = 1
         for i1, clist in enumerate(scan_condition_list_2d):
             energy_list = []
@@ -673,11 +673,11 @@ def _scan2d(input_xyz_file: Path,
                             traj = read(f'{trajfile}@0:')
                             write(trafxyzfile, traj, format='xyz')
                         except Exception:
-                            print('Trajectory conversion failed.')
+                            print('Warning: Failed to convert optimization trajectory to XYZ format.')
                             traceback.print_exc()
                     coordinates_list.append(np.copy(atoms.positions))
                     energy_list.append(final_energy)
-                    print(f'{count}/{scan1.num_step*scan2.num_step} done.')
+                    print(f'Grid point {count}/{scan1.num_step*scan2.num_step} completed.')
                     count += 1
                 except UMATerminationError:  # When user stop
                     try:
@@ -722,10 +722,10 @@ def _scan2d(input_xyz_file: Path,
             num_procs = None
         else:
             num_procs = int(omp_num_threads.split(',')[0])
-        print('Saddle point checking...')
+        print('Performing saddle point check (spline interpolation)...')
         saddle_check_list = saddle.check_saddle_2d(relative_energy_list, scan1.num_step, scan2.num_step,
                                                    grad_tol=None, num_procs=num_procs)
-        print('done.')
+        print('Saddle point check completed.')
         # output csv data
         csv_data = [['2d', str(scan1.num_step), str(scan2.num_step)],
                     ['#',
@@ -780,7 +780,7 @@ def _scan_concerted(input_xyz_file: Path,
                     constrains: List[UMAConstrain],
                     keep_log: int = 0) -> None:
     if len(set([s.num_step for s in scans])) > 1:
-        raise ValueError('For concerted scan, all scan steps must be the same.')
+        raise ValueError('For a concerted scan, all scan variables must have the exact same number of steps.')
     # common pre-process
     result_xyz_file: Path = input_xyz_file.parent / (job_name + '.xyz')
     stop_file: Path = input_xyz_file.parent / (job_name + config.STOP_FILE_SUFFIX)
@@ -803,7 +803,7 @@ def _scan_concerted(input_xyz_file: Path,
         scan_condition_list = prepare_ase_constrain_list_scan_concerted(scans, constrains)
         energy_list = []
         coordinates_list = []
-        print(f'Starting concerted scan ({scans[0].num_step} points)')
+        print(f'Starting UMA concerted scan ({scans[0].num_step} steps)...')
         for n, scan_condition in enumerate(scan_condition_list):
             try:
                 scan_dir = Path(f'./scan_{n+1}')
@@ -822,11 +822,11 @@ def _scan_concerted(input_xyz_file: Path,
                         traj = read(f'{trajfile}@0:')
                         write(trafxyzfile, traj, format='xyz')
                     except Exception:
-                        print('Trajectory conversion failed.')
+                        print('Warning: Failed to convert optimization trajectory to XYZ format.')
                         traceback.print_exc()
                 coordinates_list.append(np.copy(atoms.positions))
                 energy_list.append(final_energy)
-                print(f'{n+1}/{scans[0].num_step} done.')
+                print(f'Step {n+1}/{scans[0].num_step} completed.')
             except UMATerminationError:  # When user stop
                 try:
                     if os.path.exists(trajfile):

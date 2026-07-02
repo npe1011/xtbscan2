@@ -1,6 +1,6 @@
 [project]
 name = "xtbscan2-gpu"
-version = "0.1.0"
+version = "0.5.0"
 description = "GUI tool for structural optimization and scan calculations using xtb or fairchem-core (GPU enabled)."
 readme = "../README.md"
 requires-python = ">=3.11"
