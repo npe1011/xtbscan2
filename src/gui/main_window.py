@@ -26,6 +26,7 @@ class MainWindow(QMainWindow):
         
         self.current_input_file = None
         self.process = None
+        self.is_result_loaded = False
         
         self.setup_ui()
         
@@ -152,6 +153,8 @@ class MainWindow(QMainWindow):
         btn_layout.addStretch()
         self.run_btn = QPushButton("Run Calculation")
         self.run_btn.clicked.connect(self.run_calculation)
+        self.run_btn.setEnabled(False)
+        self.run_btn.setToolTip("Please open or drop an Initial Structure to run a calculation.")
         self.run_btn.setFixedSize(140, 36)
         self.run_btn.setStyleSheet("QPushButton { background-color: #2E7D32; color: white; font-weight: bold; border-radius: 4px; } QPushButton:disabled { background-color: #555555; color: #888888; }")
         
@@ -232,6 +235,12 @@ class MainWindow(QMainWindow):
 
     def load_input_file(self, file_path):
         self.current_input_file = file_path
+        self.is_result_loaded = False
+        self.run_btn.setEnabled(True)
+        self.run_btn.setToolTip("")
+        if hasattr(self, 'plot_widget') and self.plot_widget:
+            self.plot_widget.clear_plot()
+        self.tabs.setCurrentIndex(0)
         self.file_path_label.setText(f"Initial: {file_path}")
         self.file_path_label.setStyleSheet("""
             QLabel {
@@ -257,6 +266,9 @@ class MainWindow(QMainWindow):
             self.log_text.append(f"<span style='color:red'>Failed to load structure: {e}</span>")
             
     def load_result_file(self, file_path):
+        self.is_result_loaded = True
+        self.run_btn.setEnabled(False)
+        self.run_btn.setToolTip("Calculation cannot be run when a result file is loaded. Please open or drop an Initial Structure.")
         self.file_path_label.setText(f"Result: {file_path}")
         self.file_path_label.setStyleSheet("""
             QLabel {
@@ -337,8 +349,8 @@ class MainWindow(QMainWindow):
             self.log_text.append(f"<span style='color:red'>Failed to load result structure: {e}</span>")
         
     def run_calculation(self):
-        if not self.current_input_file:
-            QMessageBox.warning(self, "Warning", "No structure loaded.")
+        if not self.current_input_file or getattr(self, 'is_result_loaded', False):
+            QMessageBox.warning(self, "Warning", "Please load an Initial Structure before running a calculation.")
             return
             
         # Prepare job config
@@ -403,7 +415,8 @@ class MainWindow(QMainWindow):
             self.log_text.ensureCursorVisible()
         
     def process_finished(self, exit_code, exit_status):
-        self.run_btn.setEnabled(True)
+        if not getattr(self, 'is_result_loaded', False):
+            self.run_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         self.log_text.append(f"\nProcess finished with exit code {exit_code}")
         

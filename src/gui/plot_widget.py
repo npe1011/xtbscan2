@@ -144,9 +144,32 @@ class PlotWidget(QWidget):
         self.btn_save_xyz.clicked.connect(self._save_step_xyz)
         self.cb_annotation.toggled.connect(lambda _: self._draw_plot())
         self.btn_show_table.clicked.connect(self._show_table_data)
+        self.clear_plot()
 
     def set_viewer(self, viewer):
         self.viewer = viewer
+
+    def clear_plot(self):
+        self.energies = []
+        self.saddle_flags = []
+        self.csv_rows = []
+        self.trajectory_xyz_str = ""
+        self.result_file_path = None
+        self.step_numbers = []
+        self.atoms = []
+        self.coords_list = []
+        if getattr(self, 'is_animating', False) and hasattr(self, 'timer'):
+            self.timer.stop()
+        self.is_animating = False
+        if hasattr(self, 'btn_animate'):
+            self.btn_animate.setText("Start Animate")
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        ax.text(0.5, 0.5, "No scan result loaded", horizontalalignment='center', verticalalignment='center', color='#888888', fontsize=14)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_facecolor('#2B2B2B')
+        self.canvas.draw()
 
     def set_result_data(self, energies, saddle_flags, csv_rows, trajectory_xyz_str, result_file_path):
         self.energies = energies or []
