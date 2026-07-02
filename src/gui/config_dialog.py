@@ -15,7 +15,7 @@ class ConfigDialog(QDialog):
         self.xtb_bin_edit = QLineEdit(config.get("XTB_BIN", "xtb"))
         self.xtb_param_dir_edit = QLineEdit(config.get("XTB_PARAM_DIR", ""))
         self.uma_param_edit = QLineEdit(config.get("UMA_PARAM_PATH", "uma-s-1p1.pt"))
-        self.uma_gpu_cb = QCheckBox("Use GPU for UMA")
+        self.uma_gpu_cb = QCheckBox("Use GPU for UMA (Auto-fallback to CPU)")
         self.uma_gpu_cb.setChecked(config.get("UMA_USE_GPU", False))
         
         self.xtb_bin_edit.textChanged.connect(self.auto_update_param_dir)

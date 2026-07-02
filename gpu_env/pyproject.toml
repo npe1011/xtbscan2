@@ -1,8 +1,8 @@
 [project]
-name = "xtbscan2"
+name = "xtbscan2-gpu"
 version = "0.1.0"
-description = "GUI tool for structural optimization and scan calculations using xtb or fairchem-core."
-readme = "README.md"
+description = "GUI tool for structural optimization and scan calculations using xtb or fairchem-core (GPU enabled)."
+readme = "../README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "Tatsuhiko Yoshino" }
@@ -18,18 +18,13 @@ dependencies = [
     "matplotlib"
 ]
 
-[dependency-groups]
-dev = [
-    "pytest"
-]
-
 [tool.uv]
 compile-bytecode = true
 
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
 [tool.uv.sources]
-torch = [{ index = "pytorch-cpu" }]
+torch = [{ index = "pytorch-cu126" }]

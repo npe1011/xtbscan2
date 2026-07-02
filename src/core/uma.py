@@ -82,8 +82,11 @@ def get_uma_calculator(model_path: Path, device: Literal['cuda', 'cpu']):
     """
     if not load_uma_modules():
         raise RuntimeError('Import of ASE/torch/fairchem-core failed.')
+    if device == 'cuda' and not torch.cuda.is_available():
+        print("Warning: CUDA is not available or CPU-only PyTorch is installed. Automatically falling back to CPU.")
+        device = 'cpu'
     model_path = str(model_path)
-    print(f'Loading {model_path} and setup uma calculator...')
+    print(f'Loading {model_path} and setup uma calculator on {device}...')
     uma_predictor = load_predict_unit(path=model_path, device=device)
     calculator = FAIRChemCalculator(uma_predictor, task_name='omol')
     print('Calculator is ready.')
