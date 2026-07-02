@@ -108,7 +108,7 @@ def read_xtbscan_file(file: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, n
         elif title.startswith('scf done'):
             # case
             # SCF done      -7.33636977
-            energy_list.append(title.split('done', maxsplit=1)[1].strip().split()[0].strip())
+            energy_list.append(float(title.split('done', maxsplit=1)[1].strip().split()[0].strip()))
         else:
             raise ValueError(str(file) + 'is not a valid xtbscan file. Energy value cannot be read.')
 
@@ -164,8 +164,11 @@ def calc_angle(coordinates: np.ndarray, atom_indices: Union[np.ndarray, List[int
     a = np.linalg.norm(target_coordinates[2] - target_coordinates[1])
     b = np.linalg.norm(target_coordinates[0] - target_coordinates[1])
     c = np.linalg.norm(target_coordinates[2] - target_coordinates[0])
-    cos = (a*a + b*b - c*c) / (2.0 * a * b)
-    v = float(np.degrees(np.arccos(cos)))
+    if a * b == 0.0:
+        v = 0.0
+    else:
+        cos = np.clip((a*a + b*b - c*c) / (2.0 * a * b), -1.0, 1.0)
+        v = float(np.degrees(np.arccos(cos)))
 
     if not string:
         return v
@@ -195,7 +198,11 @@ def calc_dihedral(coordinates: np.ndarray, atom_indices: Union[np.ndarray, List[
     b1xb2 = np.cross(b2, b1)
 
     b0xb1_x_b1xb2 = np.cross(b0xb1, b1xb2)
-    y = np.dot(b0xb1_x_b1xb2, b1) * (1.0 / np.linalg.norm(b1))
+    norm_b1 = np.linalg.norm(b1)
+    if norm_b1 == 0.0:
+        y = 0.0
+    else:
+        y = np.dot(b0xb1_x_b1xb2, b1) * (1.0 / norm_b1)
 
     x = np.dot(b0xb1, b1xb2)
 

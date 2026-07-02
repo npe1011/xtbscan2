@@ -73,9 +73,22 @@ def _check_saddle_2d_with_spline_fit(energies: np.ndarray, num_dim1: int, num_di
     # serialization
     data_list = [(spline, x, y, xs, ys, grad_tol) for x in mesh_xs for y in mesh_ys]
     # calculate
-    _set_threads(1)  # multiprocessing with 1 threads
-    with Pool(processes=num_procs) as p:
-        result = p.starmap(_check_saddle_for_pal, data_list)
+    old_omp = os.environ.get('OMP_NUM_THREADS')
+    old_mkl = os.environ.get('MKL_NUM_THREADS')
+    try:
+        _set_threads(1)  # multiprocessing with 1 threads
+        with Pool(processes=num_procs) as p:
+            result = p.starmap(_check_saddle_for_pal, data_list)
+    finally:
+        if old_omp is not None:
+            os.environ['OMP_NUM_THREADS'] = old_omp
+        elif 'OMP_NUM_THREADS' in os.environ:
+            del os.environ['OMP_NUM_THREADS']
+        if old_mkl is not None:
+            os.environ['MKL_NUM_THREADS'] = old_mkl
+        elif 'MKL_NUM_THREADS' in os.environ:
+            del os.environ['MKL_NUM_THREADS']
+            
     # read result and set saddle_check_list
     for res in result:
         if res is not None:

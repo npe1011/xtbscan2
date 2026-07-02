@@ -153,15 +153,17 @@ HTML_TEMPLATE = """
             else if (measureMode === 'dihedral') {{
                 let a3 = selectedAtoms[2];
                 let a4 = selectedAtoms[3];
-                let b1 = sub(a2, a1);
-                let b2 = sub(a3, a2);
-                let b3 = sub(a4, a3);
-                let n1 = cross(b1, b2);
-                let n2 = cross(b2, b3);
-                let m1 = cross(n1, norm(b2));
-                let x = dot(n1, n2);
-                let y = dot(m1, n2);
+                let b0 = sub(a1, a2);
+                let b1 = sub(a3, a2);
+                let b2 = sub(a4, a3);
+                let b0xb1 = cross(b0, b1);
+                let b1xb2 = cross(b2, b1);
+                let b0xb1_x_b1xb2 = cross(b0xb1, b1xb2);
+                let nb1 = mag(b1);
+                let y = (nb1 === 0) ? 0 : dot(b0xb1_x_b1xb2, b1) / nb1;
+                let x = dot(b0xb1, b1xb2);
                 let dihedral = Math.atan2(y, x) * 180 / Math.PI;
+                if (dihedral < 0.0) {{ dihedral += 360.0; }}
                 let mid = scale(add(a2, a3), 0.5);
                 let lblData = {{position: mid, backgroundColor: 'black', fontColor: 'cyan'}};
                 measurementShapes.push({{type: 'label', text: dihedral.toFixed(1) + " deg", data: lblData}});
@@ -339,7 +341,6 @@ class Viewer3D(QWidget):
         if hasattr(self, 'web_view') and self.web_view:
             self.web_view.stop()
             page = self.web_view.page()
-            self.web_view.setPage(None)
             if page:
                 page.deleteLater()
             self.web_view.deleteLater()

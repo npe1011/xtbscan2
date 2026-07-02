@@ -109,7 +109,7 @@ class ConstrainDialog(QDialog):
         self.atoms_edit.setToolTip("1-based atom indices separated by commas")
         
         self.value_spin = QDoubleSpinBox()
-        self.value_spin.setRange(-360, 1000)
+        self.value_spin.setRange(-999.0, 1000.0)
         self.value_spin.setDecimals(3)
         self.value_spin.setSpecialValueText("Auto")
         self.value_spin.setValue(self.value_spin.minimum()) # Minimum implies auto in our logic

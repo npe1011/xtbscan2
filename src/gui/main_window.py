@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import tempfile
+import html
 from pathlib import Path
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QSplitter, QFileDialog, QMessageBox, QTabWidget,
@@ -214,7 +215,13 @@ class MainWindow(QMainWindow):
                     self.load_result_file(file_path)
                 else:
                     pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
-                    if hasattr(self, 'left_widget') and pos.x() < self.left_widget.width():
+                    is_left = False
+                    widget_under_pos = self.childAt(pos)
+                    if widget_under_pos and hasattr(self, 'left_widget'):
+                        is_left = (widget_under_pos == self.left_widget or self.left_widget.isAncestorOf(widget_under_pos))
+                    elif hasattr(self, 'left_widget'):
+                        is_left = self.left_widget.geometry().contains(pos)
+                    if is_left:
                         self.load_input_file(file_path)
                     else:
                         self.load_result_file(file_path)
@@ -377,10 +384,13 @@ class MainWindow(QMainWindow):
         
         # Write to temp json
         fd, json_path = tempfile.mkstemp(suffix=".json")
+        self._temp_json_path = json_path
         with os.fdopen(fd, 'w') as f:
             json.dump(job_data, f)
             
         # Start QProcess
+        if hasattr(self, 'process') and self.process:
+            self.process.deleteLater()
         self.process = QProcess(self)
         self.process.readyReadStandardOutput.connect(self.handle_stdout)
         self.process.readyReadStandardError.connect(self.handle_stderr)
@@ -397,24 +407,35 @@ class MainWindow(QMainWindow):
         self.run_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         
+    def cleanup_temp_json(self):
+        if hasattr(self, '_temp_json_path') and self._temp_json_path:
+            try:
+                if os.path.exists(self._temp_json_path):
+                    os.unlink(self._temp_json_path)
+            except Exception:
+                pass
+            self._temp_json_path = None
+
     def stop_calculation(self):
         if self.process and self.process.state() == QProcess.ProcessState.Running:
             self.process.kill()
             self.log_text.append("\nCalculation stopped by user.")
+        self.cleanup_temp_json()
             
     def handle_stdout(self):
         data = self.process.readAllStandardOutput().data().decode('utf-8', errors='replace')
         if data.strip():
-            self.log_text.append(data.strip())
+            self.log_text.append(html.escape(data.strip()))
             self.log_text.ensureCursorVisible()
         
     def handle_stderr(self):
         data = self.process.readAllStandardError().data().decode('utf-8', errors='replace')
         if data.strip():
-            self.log_text.append(f"<span style='color:red'>{data.strip()}</span>")
+            self.log_text.append(f"<span style='color:red'>{html.escape(data.strip())}</span>")
             self.log_text.ensureCursorVisible()
         
     def process_finished(self, exit_code, exit_status):
+        self.cleanup_temp_json()
         if not getattr(self, 'is_result_loaded', False):
             self.run_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)

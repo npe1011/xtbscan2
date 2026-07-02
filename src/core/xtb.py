@@ -36,7 +36,7 @@ class XTBParams:
                 solvation = solvation.lower()
                 assert solvation in ['alpb', 'gbsa', 'cosmo', 'gbe']
                 assert solvent is not None
-                assert len(solvent) != ''
+                assert solvent != ''
         except AssertionError as e:
             raise ValueError('Given XTB parameters are not valid. ' + str(e.args))
 
@@ -404,7 +404,7 @@ def _scan2d(input_xyz_file: Path, job_name: str, xtb_params: XTBParams,
         relative_energy_list = (energy_list - np.min(energy_list)) * config.HARTREE_TO_KCAL
 
         # check saddle. grad_tol > default value in config
-        omp_num_threads = os.environ['OMP_NUM_THREADS']
+        omp_num_threads = os.environ.get('OMP_NUM_THREADS', '')
         if not omp_num_threads:
             num_procs = None
         else:

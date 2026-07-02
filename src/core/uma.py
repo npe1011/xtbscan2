@@ -351,6 +351,8 @@ def prepare_ase_constrain_list_scan_concerted(scans: List[UMAScan], uma_constrai
 
     # Iterate with scan parameters in 1d concerted manner.
     # Scan length must be the same for all scan objects (should be checked before here).
+    if len(set([s.num_step for s in scans])) > 1:
+        raise ValueError('For concerted scan, all scan steps must be the same.')
     scan_step = scans[0].num_step
     for i in range(scan_step):
         ase_constrains_scan = []
@@ -405,6 +407,8 @@ def umascan(input_xyz_file: Union[str, Path],
     elif len(scans) == 1:
         _scan1d(input_xyz_file, job_name, calculator, uma_params, scans[0], constrains, keep_log)
     elif concerted:
+        if len(set([s.num_step for s in scans])) > 1:
+            raise ValueError('For concerted scan, all scan steps must be the same.')
         _scan_concerted(input_xyz_file, job_name, calculator, uma_params, scans, constrains, keep_log)
     elif len(scans) == 2:
         _scan2d(input_xyz_file, job_name, calculator, uma_params, scans[0], scans[1], constrains, keep_log)
@@ -662,6 +666,8 @@ def _scan2d(input_xyz_file: Path,
                     opt.attach(_check_stop, interval=1)
                     opt.run(fmax=params.fmax, steps=params.max_cycles)
                     final_energy = atoms.get_potential_energy() / Hartree
+                    del opt
+                    gc.collect()
                     if os.path.exists(trajfile):
                         try:
                             traj = read(f'{trajfile}@0:')
@@ -773,6 +779,8 @@ def _scan_concerted(input_xyz_file: Path,
                     scans: List[UMAScan],
                     constrains: List[UMAConstrain],
                     keep_log: int = 0) -> None:
+    if len(set([s.num_step for s in scans])) > 1:
+        raise ValueError('For concerted scan, all scan steps must be the same.')
     # common pre-process
     result_xyz_file: Path = input_xyz_file.parent / (job_name + '.xyz')
     stop_file: Path = input_xyz_file.parent / (job_name + config.STOP_FILE_SUFFIX)
