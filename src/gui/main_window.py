@@ -20,7 +20,7 @@ from core import xyzutils
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("xtbscan2 - GUI")
+        self.setWindowTitle("xtbscan2")
         self.resize(1200, 800)
         self.setAcceptDrops(True)
         
@@ -55,9 +55,21 @@ class MainWindow(QMainWindow):
         
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
-        self.file_path_label = QLabel("No file loaded")
-        self.file_path_label.setStyleSheet("color: #E0E0E0; font-size: 13pt; font-weight: bold; padding: 4px;")
-        self.file_path_label.setMaximumHeight(50)
+        self.file_path_label = QLabel("Drop Initial File Here")
+        self.file_path_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.file_path_label.setStyleSheet("""
+            QLabel {
+                background-color: #1E3A8A;
+                color: #FFFFFF;
+                font-size: 14pt;
+                font-weight: bold;
+                border: 3px dashed #60A5FA;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        self.file_path_label.setMinimumHeight(80)
+        self.file_path_label.setMaximumHeight(100)
         self.file_path_label.setWordWrap(True)
         left_layout.addWidget(self.file_path_label, 0)
         left_layout.addWidget(self.viewer_panel, 1)
@@ -221,6 +233,17 @@ class MainWindow(QMainWindow):
     def load_input_file(self, file_path):
         self.current_input_file = file_path
         self.file_path_label.setText(f"Initial: {file_path}")
+        self.file_path_label.setStyleSheet("""
+            QLabel {
+                background-color: #065F46;
+                color: #FFFFFF;
+                font-size: 13pt;
+                font-weight: bold;
+                border: 2px solid #34D399;
+                border-radius: 8px;
+                padding: 8px;
+            }
+        """)
         self.log_text.append(f"Loaded: {file_path}")
         if hasattr(self, 'job_name_edit'):
             self.job_name_edit.setText(f"{Path(file_path).stem}_scan")
@@ -235,6 +258,17 @@ class MainWindow(QMainWindow):
             
     def load_result_file(self, file_path):
         self.file_path_label.setText(f"Result: {file_path}")
+        self.file_path_label.setStyleSheet("""
+            QLabel {
+                background-color: #4C1D95;
+                color: #FFFFFF;
+                font-size: 13pt;
+                font-weight: bold;
+                border: 2px solid #A78BFA;
+                border-radius: 8px;
+                padding: 8px;
+            }
+        """)
         self.log_text.append(f"Loaded result: {file_path}")
         try:
             fp = Path(file_path)
