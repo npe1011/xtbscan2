@@ -34,23 +34,23 @@ HTML_TEMPLATE = """
             }}
         }});
         
+        let showLabelsState = false;
+
         function setMeasureMode(mode) {{
             measureMode = mode;
             selectedAtoms = [];
             viewer.removeAllShapes();
             for (let s of measurementShapes) {{
                 if (s.type === 'cylinder') viewer.addCylinder(s.data);
-                if (s.type === 'label') viewer.addLabel(s.text, s.data);
             }}
-            viewer.render();
+            updateLabels(showLabelsState);
         }}
         
         function clearMeasurements() {{
             measurementShapes = [];
             selectedAtoms = [];
             viewer.removeAllShapes();
-            viewer.removeAllLabels();
-            viewer.render();
+            updateLabels(showLabelsState);
         }}
 
         function loadXYZ(data) {{
@@ -68,18 +68,22 @@ HTML_TEMPLATE = """
 
         function updateLabels(show) {{
             if (!viewer) return;
+            if (show !== undefined) showLabelsState = show;
             viewer.removeAllLabels();
-            if (show) {{
+            if (showLabelsState) {{
                 let atoms = viewer.selectedAtoms({{}});
                 for (let i = 0; i < atoms.length; i++) {{
                     let atom = atoms[i];
-                    let num = atom.serial || (atom.index + 1);
+                    let num = atom.index + 1;
                     viewer.addLabel(atom.elem + num, {{
                         position: atom,
                         backgroundColor: 'black', fontColor: 'white',
                         fontSize: 14, backgroundOpacity: 0.85, borderThickness: 0
                     }});
                 }}
+            }}
+            for (let s of measurementShapes) {{
+                if (s.type === 'label') viewer.addLabel(s.text, s.data);
             }}
             viewer.render();
         }}
@@ -95,7 +99,13 @@ HTML_TEMPLATE = """
         function atomClicked(atom, viewer) {{
             if (measureMode === 'none') return;
             selectedAtoms.push(atom);
-            viewer.addSphere({{center: {{x:atom.x, y:atom.y, z:atom.z}}, radius: 0.4, color: 'yellow', alpha: 0.6}});
+            let selNum = selectedAtoms.length;
+            viewer.addSphere({{center: {{x:atom.x, y:atom.y, z:atom.z}}, radius: 0.65, color: '#00ff00', alpha: 0.7}});
+            viewer.addLabel("[" + selNum + "] " + atom.elem + (atom.index + 1), {{
+                position: atom,
+                backgroundColor: '#006600', fontColor: 'white',
+                fontSize: 13, backgroundOpacity: 0.9, borderThickness: 1, borderColor: '#00ff00'
+            }});
             viewer.render();
             
             let reqAtoms = measureMode === 'distance' ? 2 : (measureMode === 'angle' ? 3 : 4);
@@ -106,7 +116,7 @@ HTML_TEMPLATE = """
                 for (let s of measurementShapes) {{
                     if (s.type === 'cylinder') viewer.addCylinder(s.data);
                 }}
-                viewer.render();
+                updateLabels(showLabelsState);
             }}
         }}
         
@@ -270,6 +280,7 @@ class Viewer3D(QWidget):
         import json
         xyz_json = json.dumps(xyz_str)
         show_val = "true" if self.label_cb.isChecked() else "false"
+        self.btn_none.setChecked(True)
         
         js = f"""
         if(viewer) {{
@@ -292,6 +303,7 @@ class Viewer3D(QWidget):
         import json
         xyz_json = json.dumps(xyz_str)
         show_val = "true" if self.label_cb.isChecked() else "false"
+        self.btn_none.setChecked(True)
         
         js = f"""
         if(viewer) {{
@@ -303,9 +315,10 @@ class Viewer3D(QWidget):
             viewer.setStyle({{}}, {{stick: {{radius: 0.15}}, sphere: {{scale: 0.3}}}});
             viewer.zoomTo();
             viewer.setFrame(0);
+            viewer.setClickable({{}}, true, atomClicked);
+            clearMeasurements();
             updateLabels({show_val});
             viewer.render();
-            setMeasureMode('none');
         }}
         """
         self.web_view.page().runJavaScript(js)
@@ -320,7 +333,7 @@ class Viewer3D(QWidget):
             
     def set_frame(self, frame_idx: int):
         if self.is_loaded:
-            self.web_view.page().runJavaScript(f"if(viewer) {{ if(viewer.isAnimated()) viewer.stopAnimate(); viewer.setFrame({frame_idx}); viewer.render(); }}")
+            self.web_view.page().runJavaScript(f"if(viewer) {{ if(viewer.isAnimated()) viewer.stopAnimate(); viewer.setFrame({frame_idx}); viewer.setClickable({{}}, true, atomClicked); viewer.render(); }}")
 
     def cleanup(self):
         if hasattr(self, 'web_view') and self.web_view:

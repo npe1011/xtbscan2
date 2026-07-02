@@ -279,51 +279,126 @@ class PlotWidget(QWidget):
         if not hasattr(self, 'energies') or not self.energies:
             return
         self.figure.clear()
+
+        scan_type = '1d'
+        data_rows = []
+        header_row = None
+        if hasattr(self, 'csv_rows') and self.csv_rows:
+            for row in self.csv_rows:
+                if not row:
+                    continue
+                first_cell = str(row[0]).strip().lower()
+                if first_cell in ['1d', '2d', 'concerted']:
+                    scan_type = first_cell
+                    continue
+                if first_cell.startswith('#'):
+                    header_row = row
+                    continue
+                data_rows.append(row)
+
+        if header_row and scan_type == '1d':
+            real_cols = [c for c in header_row if '[real]' in str(c).lower()]
+            if len(real_cols) == 2 and hasattr(self, 'csv_rows') and 'concerted' not in str(self.csv_rows[0][0]).lower():
+                scan_type = '2d'
+            elif len(real_cols) > 2:
+                scan_type = 'concerted'
+
+        step_list = self.step_numbers if hasattr(self, 'step_numbers') and len(self.step_numbers) == len(self.energies) else list(range(1, len(self.energies) + 1))
+        current_idx = -1
+        if hasattr(self, 'current_step') and hasattr(self, 'step_numbers'):
+            if self.current_step in step_list:
+                current_idx = step_list.index(self.current_step)
+            elif 1 <= self.current_step <= len(step_list):
+                current_idx = self.current_step - 1
+
+        if scan_type == '2d' and len(data_rows) == len(self.energies) and header_row:
+            real_indices = [i for i, c in enumerate(header_row) if '[real]' in str(c).lower()]
+            if len(real_indices) >= 2:
+                idx1, idx2 = real_indices[0], real_indices[1]
+                try:
+                    x_vals = [float(str(r[idx1]).strip()) for r in data_rows]
+                    y_vals = [float(str(r[idx2]).strip()) for r in data_rows]
+                    z_vals = self.energies
+                    xlabel = str(header_row[idx1]).replace('[real]', '').replace('[REAL]', '').strip()
+                    ylabel = str(header_row[idx2]).replace('[real]', '').replace('[REAL]', '').strip()
+                    
+                    ax = self.figure.add_subplot(111)
+                    try:
+                        levels = np.linspace(min(z_vals), max(z_vals), 30) if min(z_vals) < max(z_vals) else 10
+                        cf = ax.tricontourf(x_vals, y_vals, z_vals, levels=levels, cmap='viridis')
+                        cbar = self.figure.colorbar(cf, ax=ax, pad=0.03)
+                        cbar.set_label("Relative Energy (kcal/mol)", fontsize=10)
+                        if min(z_vals) < max(z_vals):
+                            ax.tricontour(x_vals, y_vals, z_vals, levels=10, colors='black', linewidths=0.5, alpha=0.3)
+                    except Exception:
+                        sc = ax.scatter(x_vals, y_vals, c=z_vals, cmap='viridis', s=80)
+                        cbar = self.figure.colorbar(sc, ax=ax, pad=0.03)
+                        cbar.set_label("Relative Energy (kcal/mol)", fontsize=10)
+
+                    dx = (max(x_vals) - min(x_vals)) * 0.06 if max(x_vals) > min(x_vals) else 0.5
+                    dy = (max(y_vals) - min(y_vals)) * 0.06 if max(y_vals) > min(y_vals) else 0.5
+                    ax.set_xlim(min(x_vals) - dx, max(x_vals) + dx)
+                    ax.set_ylim(min(y_vals) - dy, max(y_vals) + dy)
+
+                    ax.scatter(x_vals, y_vals, marker='o', color='black', s=20, alpha=0.7, zorder=4, label='Evaluated Points')
+
+                    if hasattr(self, 'cb_annotation') and self.cb_annotation.isChecked():
+                        if len(x_vals) <= 100:
+                            for step_num, x, y in zip(step_list, x_vals, y_vals):
+                                ax.annotate(str(step_num), (x, y), textcoords="offset points", xytext=(0, 7), ha='center', fontsize=9, fontweight='bold', color='black', bbox=dict(boxstyle="round,pad=0.15", facecolor="white", edgecolor="black", linewidth=0.6, alpha=0.9), zorder=7)
+                        if hasattr(self, 'saddle_flags') and self.saddle_flags and len(self.saddle_flags) == len(self.energies):
+                            saddle_x = [x for x, s in zip(x_vals, self.saddle_flags) if s]
+                            saddle_y = [y for y, s in zip(y_vals, self.saddle_flags) if s]
+                            if saddle_x:
+                                ax.scatter(saddle_x, saddle_y, marker='*', s=260, color='white', edgecolors='black', linewidths=1.5, zorder=8, label='★ Saddle Point')
+
+                    if current_idx != -1 and current_idx < len(x_vals):
+                        ax.scatter([x_vals[current_idx]], [y_vals[current_idx]], marker='o', s=120, color='red', edgecolors='white', linewidths=2, zorder=10, label=f'Current (Step {step_list[current_idx]})')
+
+                    ax.set_title("2D Scan Energy Surface (Heatmap)", fontsize=12, fontweight='bold', pad=18)
+                    ax.set_xlabel(xlabel, fontsize=10)
+                    ax.set_ylabel(ylabel, fontsize=10)
+                    ax.grid(True, linestyle='--', alpha=0.3)
+                    self.figure.tight_layout()
+                    self.canvas.draw()
+                    return
+                except Exception as e:
+                    print(f"2D heatmap plotting failed, falling back to 1D: {e}")
+
+        # 1D or Concerted Scan plot
         ax = self.figure.add_subplot(111)
-        
-        x_vals = self.step_numbers if hasattr(self, 'step_numbers') and len(self.step_numbers) == len(self.energies) else list(range(1, len(self.energies) + 1))
-        
-        # Base plot
+        x_vals = step_list
+        xlabel = "Step"
+        if scan_type == '1d' and len(data_rows) == len(self.energies) and header_row:
+            real_indices = [i for i, c in enumerate(header_row) if '[real]' in str(c).lower()]
+            if real_indices:
+                try:
+                    x_vals = [float(str(r[real_indices[0]]).strip()) for r in data_rows]
+                    xlabel = str(header_row[real_indices[0]]).replace('[real]', '').replace('[REAL]', '').strip()
+                except Exception:
+                    x_vals = step_list
+
         ax.plot(x_vals, self.energies, marker='o', color='#1f77b4', label='Energy', zorder=2)
-        
-        # Annotations mode
+
         if hasattr(self, 'cb_annotation') and self.cb_annotation.isChecked():
-            # Write Step number above each point
-            for x, y in zip(x_vals, self.energies):
-                ax.annotate(str(x), (x, y), textcoords="offset points", xytext=(0, 8), ha='center', fontsize=9, color='#333333', zorder=4)
-            
-            # Highlight saddle points in RED
+            for step_num, x, y in zip(step_list, x_vals, self.energies):
+                ax.annotate(str(step_num), (x, y), textcoords="offset points", xytext=(0, 8), ha='center', fontsize=9, fontweight='bold', color='#111111', zorder=4)
             if hasattr(self, 'saddle_flags') and self.saddle_flags and len(self.saddle_flags) == len(self.energies):
                 saddle_x = [x for x, s in zip(x_vals, self.saddle_flags) if s]
                 saddle_y = [y for y, s in zip(self.energies, self.saddle_flags) if s]
                 if saddle_x:
                     ax.scatter(saddle_x, saddle_y, color='red', s=70, zorder=5, label='Saddle Point')
-                    
-        # Highlight currently selected step
-        if hasattr(self, 'current_step') and hasattr(self, 'step_numbers'):
-            if self.current_step in x_vals:
-                idx = x_vals.index(self.current_step)
-                ax.scatter([x_vals[idx]], [self.energies[idx]], color='orange', s=100, edgecolor='black', zorder=6, label=f'Current (Step {self.current_step})')
-            elif 1 <= self.current_step <= len(x_vals):
-                idx = self.current_step - 1
-                ax.scatter([x_vals[idx]], [self.energies[idx]], color='orange', s=100, edgecolor='black', zorder=6, label=f'Current (Step {x_vals[idx]})')
-            
-        ax.set_title("Scan Energy Profile", fontsize=12, fontweight='bold')
-        ax.set_xlabel("Step", fontsize=10)
+
+        if current_idx != -1 and current_idx < len(x_vals):
+            ax.scatter([x_vals[current_idx]], [self.energies[current_idx]], color='orange', s=100, edgecolor='black', zorder=6, label=f'Current (Step {step_list[current_idx]})')
+
+        title_str = "Scan Energy Profile" if scan_type != 'concerted' else "Concerted Scan Energy Profile"
+        ax.set_title(title_str, fontsize=12, fontweight='bold', pad=14)
+        ax.set_xlabel(xlabel, fontsize=10)
         ax.set_ylabel("Relative Energy (kcal/mol)", fontsize=10)
         ax.grid(True, linestyle='--', alpha=0.5)
-        if hasattr(self, 'cb_annotation') and self.cb_annotation.isChecked() and hasattr(self, 'saddle_flags') and any(self.saddle_flags):
-            ax.legend(loc='best')
         self.figure.tight_layout()
         self.canvas.draw()
 
     def plot_2d_scan(self, x_vals, y_vals, z_vals, title="2D Scan Energy Surface", xlabel="X", ylabel="Y", zlabel="Relative Energy (kcal/mol)"):
-        self.figure.clear()
-        ax = self.figure.add_subplot(111, projection='3d')
-        ax.plot_trisurf(x_vals, y_vals, z_vals, cmap='viridis', edgecolor='none')
-        ax.set_title(title)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-        ax.set_zlabel(zlabel)
-        self.figure.tight_layout()
-        self.canvas.draw()
+        self._draw_plot()

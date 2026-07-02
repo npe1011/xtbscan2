@@ -277,14 +277,12 @@ class MainWindow(QMainWindow):
                             continue
                         try:
                             is_saddle = False
-                            if len(row) >= 6 and row[5].strip().lower() == 'true':
+                            if len(row) >= 2 and str(row[-1]).strip().lower() in ['true', '1', 'yes']:
                                 is_saddle = True
                             saddle_flags.append(is_saddle)
                             
-                            if len(row) >= 5 and row[4].replace('.', '', 1).replace('-', '', 1).isdigit():
-                                energies.append(float(row[4]))
-                            elif len(row) >= 4:
-                                energies.append(float(row[3]))
+                            if len(row) >= 2:
+                                energies.append(float(str(row[-2]).strip()))
                         except:
                             pass
             elif xyz_path and xyz_path.exists():

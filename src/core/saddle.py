@@ -85,16 +85,16 @@ def _check_saddle_2d_with_spline_fit(energies: np.ndarray, num_dim1: int, num_di
 
 def _check_saddle_for_pal(spline, x, y, xs, ys, grad_tol) -> Optional[tuple]:
     # first derivatives and stationary point check
-    dx = float(spline(x, y, dx=1, dy=0))
-    dy = float(spline(x, y, dx=0, dy=1))
+    dx = float(spline(x, y, dx=1, dy=0).item())
+    dy = float(spline(x, y, dx=0, dy=1).item())
     df_norm = np.sqrt(dx ** 2 + dy ** 2)
     if df_norm > grad_tol:
         return None
 
     # Hessian and saddle check
-    dx2 = float(spline(x, y, dx=2, dy=0))
-    dy2 = float(spline(x, y, dx=0, dy=2))
-    dxdy = float(spline(x, y, dx=1, dy=1))
+    dx2 = float(spline(x, y, dx=2, dy=0).item())
+    dy2 = float(spline(x, y, dx=0, dy=2).item())
+    dxdy = float(spline(x, y, dx=1, dy=1).item())
     hessian = np.array([[dx2, dxdy], [dxdy, dy2]])
     eigenvalues = np.linalg.eigvals(hessian)
     if np.all(eigenvalues > 0) or np.all(eigenvalues < 0):

@@ -266,17 +266,31 @@ class SettingsTablesWidget(QWidget):
     def add_scan(self):
         dlg = ScanDialog(self)
         dlg.set_structure(self.current_atoms, self.current_coords)
-        if dlg.exec():
-            self.scans_data.append(dlg.get_data())
-            self._refresh_scans_table()
+        dlg.setModal(False)
+        dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowType.Window)
+        dlg.accepted.connect(lambda: self._on_scan_added(dlg))
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    def _on_scan_added(self, dlg):
+        self.scans_data.append(dlg.get_data())
+        self._refresh_scans_table()
 
     def edit_scan(self, index):
         row = index.row()
         dlg = ScanDialog(self, self.scans_data[row])
         dlg.set_structure(self.current_atoms, self.current_coords)
-        if dlg.exec():
-            self.scans_data[row] = dlg.get_data()
-            self._refresh_scans_table()
+        dlg.setModal(False)
+        dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowType.Window)
+        dlg.accepted.connect(lambda: self._on_scan_edited(dlg, row))
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    def _on_scan_edited(self, dlg, row):
+        self.scans_data[row] = dlg.get_data()
+        self._refresh_scans_table()
 
     def delete_scan(self):
         for item in self.scans_table.selectedItems():
@@ -289,17 +303,31 @@ class SettingsTablesWidget(QWidget):
     def add_constrain(self):
         dlg = ConstrainDialog(self)
         dlg.set_structure(self.current_atoms, self.current_coords)
-        if dlg.exec():
-            self.constrains_data.append(dlg.get_data())
-            self._refresh_constrains_table()
+        dlg.setModal(False)
+        dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowType.Window)
+        dlg.accepted.connect(lambda: self._on_constrain_added(dlg))
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    def _on_constrain_added(self, dlg):
+        self.constrains_data.append(dlg.get_data())
+        self._refresh_constrains_table()
 
     def edit_constrain(self, index):
         row = index.row()
         dlg = ConstrainDialog(self, self.constrains_data[row])
         dlg.set_structure(self.current_atoms, self.current_coords)
-        if dlg.exec():
-            self.constrains_data[row] = dlg.get_data()
-            self._refresh_constrains_table()
+        dlg.setModal(False)
+        dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowType.Window)
+        dlg.accepted.connect(lambda: self._on_constrain_edited(dlg, row))
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    def _on_constrain_edited(self, dlg, row):
+        self.constrains_data[row] = dlg.get_data()
+        self._refresh_constrains_table()
 
     def delete_constrain(self):
         for item in self.constrains_table.selectedItems():
