@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
                                QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-                               QSpinBox, QDoubleSpinBox, QMessageBox)
+                               QSpinBox, QDoubleSpinBox, QMessageBox, QLabel, QCheckBox)
 from PySide6.QtCore import Qt
 import numpy as np
 import re
@@ -180,6 +180,17 @@ class SettingsTablesWidget(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         
+        # Scans Header & Concerted Scan Checkbox
+        scans_header = QHBoxLayout()
+        scans_label = QLabel("<b>Scans</b>")
+        scans_label.setStyleSheet("font-size: 11pt;")
+        self.concerted_cb = QCheckBox("Concerted Scan")
+        self.concerted_cb.setToolTip("Perform concerted scan for multiple parameters with same step size")
+        scans_header.addWidget(scans_label)
+        scans_header.addStretch()
+        scans_header.addWidget(self.concerted_cb)
+        layout.addLayout(scans_header)
+        
         # Scans Table
         self.scans_table = QTableWidget(0, 5)
         self.scans_table.setHorizontalHeaderLabels(["Type", "Atoms", "Start", "End", "Steps"])
@@ -198,6 +209,13 @@ class SettingsTablesWidget(QWidget):
         
         layout.addWidget(self.scans_table)
         layout.addLayout(btn_layout1)
+        
+        layout.addSpacing(15)
+        
+        # Constrains Header
+        constrains_label = QLabel("<b>Constrains</b>")
+        constrains_label.setStyleSheet("font-size: 11pt;")
+        layout.addWidget(constrains_label)
         
         # Constrains Table
         self.constrains_table = QTableWidget(0, 3)
@@ -296,3 +314,7 @@ class SettingsTablesWidget(QWidget):
         
     def get_constrains(self):
         return self.constrains_data
+
+    def is_concerted(self):
+        return self.concerted_cb.isChecked()
+

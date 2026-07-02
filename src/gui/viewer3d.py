@@ -66,6 +66,24 @@ HTML_TEMPLATE = """
             clearMeasurements(); 
         }}
 
+        function updateLabels(show) {{
+            if (!viewer) return;
+            viewer.removeAllLabels();
+            if (show) {{
+                let atoms = viewer.selectedAtoms({{}});
+                for (let i = 0; i < atoms.length; i++) {{
+                    let atom = atoms[i];
+                    let num = atom.serial || (atom.index + 1);
+                    viewer.addLabel(atom.elem + num, {{
+                        position: atom,
+                        backgroundColor: 'black', fontColor: 'white',
+                        fontSize: 14, backgroundOpacity: 0.85, borderThickness: 0
+                    }});
+                }}
+            }}
+            viewer.render();
+        }}
+
         function sub(v1, v2) {{ return {{x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z}}; }}
         function add(v1, v2) {{ return {{x: v1.x + v2.x, y: v1.y + v2.y, z: v1.z + v2.z}}; }}
         function dot(v1, v2) {{ return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z; }}
@@ -224,37 +242,16 @@ class Viewer3D(QWidget):
             return
         self.is_loaded = True
         if self.pending_xyz:
-            self.load_xyz(self.pending_xyz)
+            if getattr(self, 'pending_mode', 'xyz') == 'trajectory':
+                self.load_trajectory(self.pending_xyz)
+            else:
+                self.load_xyz(self.pending_xyz)
             self.pending_xyz = None
 
     def toggle_labels(self, state):
         if self.is_loaded:
-            if state:
-                self.web_view.page().runJavaScript("""
-                if(viewer) {
-                    let atoms = viewer.getModel().selectedAtoms({});
-                    for(let i=0; i<atoms.length; i++){
-                        atoms[i].myLabel = viewer.addLabel(atoms[i].elem + (i+1), 
-                            {position: {x:atoms[i].x, y:atoms[i].y, z:atoms[i].z}, 
-                             backgroundColor: 'black', fontColor: 'white', 
-                             fontSize: 14, backgroundOpacity: 0.85, borderThickness: 0});
-                    }
-                    viewer.render();
-                }
-                """)
-            else:
-                self.web_view.page().runJavaScript("""
-                if(viewer) {
-                    let atoms = viewer.getModel().selectedAtoms({});
-                    for(let i=0; i<atoms.length; i++){
-                        if(atoms[i].myLabel) {
-                            viewer.removeLabel(atoms[i].myLabel);
-                            atoms[i].myLabel = null;
-                        }
-                    }
-                    viewer.render();
-                }
-                """)
+            show_val = "true" if state else "false"
+            self.web_view.page().runJavaScript(f"updateLabels({show_val});")
 
     def set_mode(self, mode: str):
         if self.is_loaded:
@@ -267,10 +264,12 @@ class Viewer3D(QWidget):
     def load_xyz(self, xyz_str: str):
         if not self.is_loaded:
             self.pending_xyz = xyz_str
+            self.pending_mode = 'xyz'
             return
             
         import json
         xyz_json = json.dumps(xyz_str)
+        show_val = "true" if self.label_cb.isChecked() else "false"
         
         js = f"""
         if(viewer) {{
@@ -280,18 +279,19 @@ class Viewer3D(QWidget):
             viewer.clear();
         }}
         loadXYZ({xyz_json});
+        updateLabels({show_val});
         """
         self.web_view.page().runJavaScript(js)
-        if self.label_cb.isChecked():
-            self.toggle_labels(True)
 
     def load_trajectory(self, xyz_str: str):
         if not self.is_loaded:
             self.pending_xyz = xyz_str
+            self.pending_mode = 'trajectory'
             return
             
         import json
         xyz_json = json.dumps(xyz_str)
+        show_val = "true" if self.label_cb.isChecked() else "false"
         
         js = f"""
         if(viewer) {{
@@ -302,10 +302,34 @@ class Viewer3D(QWidget):
             viewer.addModelsAsFrames({xyz_json}, "xyz");
             viewer.setStyle({{}}, {{stick: {{radius: 0.15}}, sphere: {{scale: 0.3}}}});
             viewer.zoomTo();
-            viewer.animate({{loop: "forward", step: 1, interval: 250}});
+            viewer.setFrame(0);
+            updateLabels({show_val});
+            viewer.render();
             setMeasureMode('none');
         }}
         """
         self.web_view.page().runJavaScript(js)
-        if self.label_cb.isChecked():
-            self.toggle_labels(True)
+
+    def start_animate(self):
+        if self.is_loaded:
+            self.web_view.page().runJavaScript("if(viewer) { viewer.animate({loop: 'forward', step: 1, interval: 250}); }")
+            
+    def stop_animate(self):
+        if self.is_loaded:
+            self.web_view.page().runJavaScript("if(viewer) { if(viewer.isAnimated()) viewer.stopAnimate(); }")
+            
+    def set_frame(self, frame_idx: int):
+        if self.is_loaded:
+            self.web_view.page().runJavaScript(f"if(viewer) {{ if(viewer.isAnimated()) viewer.stopAnimate(); viewer.setFrame({frame_idx}); viewer.render(); }}")
+
+    def cleanup(self):
+        if hasattr(self, 'web_view') and self.web_view:
+            self.web_view.stop()
+            page = self.web_view.page()
+            self.web_view.setPage(None)
+            if page:
+                page.deleteLater()
+            self.web_view.deleteLater()
+            self.web_view = None
+
+

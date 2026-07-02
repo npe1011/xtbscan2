@@ -56,10 +56,11 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
         self.file_path_label = QLabel("No file loaded")
-        self.file_path_label.setStyleSheet("color: gray;")
+        self.file_path_label.setStyleSheet("color: #E0E0E0; font-size: 13pt; font-weight: bold; padding: 4px;")
+        self.file_path_label.setMaximumHeight(50)
         self.file_path_label.setWordWrap(True)
-        left_layout.addWidget(self.file_path_label)
-        left_layout.addWidget(self.viewer_panel)
+        left_layout.addWidget(self.file_path_label, 0)
+        left_layout.addWidget(self.viewer_panel, 1)
         
         left_widget = QWidget()
         left_widget.setLayout(left_layout)
@@ -79,12 +80,18 @@ class MainWindow(QMainWindow):
         calc_tab = QWidget()
         calc_layout = QVBoxLayout(calc_tab)
         
+        job_layout = QHBoxLayout()
+        job_label = QLabel("Job Name:")
+        job_label.setStyleSheet("font-weight: bold;")
+        self.job_name_edit = QLineEdit()
+        job_layout.addWidget(job_label)
+        job_layout.addWidget(self.job_name_edit)
+        calc_layout.addLayout(job_layout)
+        
         # Settings Form Layout
         settings_layout = QHBoxLayout()
         
         form1 = QFormLayout()
-        self.job_name_edit = QLineEdit()
-        form1.addRow("Job Name", self.job_name_edit)
         self.engine_combo = QComboBox()
         self.engine_combo.addItems(["xtb", "uma"])
         form1.addRow("Engine", self.engine_combo)
@@ -109,17 +116,13 @@ class MainWindow(QMainWindow):
         self.mult_spin.setRange(1, 10)
         form2.addRow("Multiplicity", self.mult_spin)
         
-        self.concerted_cb = QCheckBox("Concerted Scan")
-        self.concerted_cb.setToolTip("Perform concerted scan for multiple parameters with same step size")
-        form2.addRow("", self.concerted_cb)
-        
         settings_layout.addLayout(form2)
         calc_layout.addLayout(settings_layout)
         
         # Separator line
         line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
         calc_layout.addWidget(line)
         
         # Connect signals for disabling logic
@@ -129,6 +132,28 @@ class MainWindow(QMainWindow):
         # Scans/Constrains Tables
         self.tables_widget = SettingsTablesWidget()
         calc_layout.addWidget(self.tables_widget)
+        
+        calc_layout.addSpacing(10)
+        
+        # Run Calculation / Stop buttons slightly below table
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        self.run_btn = QPushButton("Run Calculation")
+        self.run_btn.clicked.connect(self.run_calculation)
+        self.run_btn.setFixedSize(140, 36)
+        self.run_btn.setStyleSheet("QPushButton { background-color: #2E7D32; color: white; font-weight: bold; border-radius: 4px; } QPushButton:disabled { background-color: #555555; color: #888888; }")
+        
+        self.stop_btn = QPushButton("Stop")
+        self.stop_btn.clicked.connect(self.stop_calculation)
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.setFixedSize(100, 36)
+        self.stop_btn.setStyleSheet("QPushButton { background-color: #C62828; color: white; font-weight: bold; border-radius: 4px; } QPushButton:disabled { background-color: #555555; color: #888888; }")
+        
+        btn_layout.addWidget(self.run_btn)
+        btn_layout.addWidget(self.stop_btn)
+        btn_layout.addStretch()
+        calc_layout.addLayout(btn_layout)
+        calc_layout.addStretch()
         
         self.tabs.addTab(calc_tab, "Calculation")
         
@@ -142,18 +167,8 @@ class MainWindow(QMainWindow):
         
         # 4. Result Tab
         self.plot_widget = PlotWidget()
+        self.plot_widget.set_viewer(self.viewer_panel)
         self.tabs.addTab(self.plot_widget, "Result")
-        
-        # Control Buttons
-        btn_layout = QHBoxLayout()
-        self.run_btn = QPushButton("Run Calculation")
-        self.run_btn.clicked.connect(self.run_calculation)
-        self.stop_btn = QPushButton("Stop")
-        self.stop_btn.clicked.connect(self.stop_calculation)
-        self.stop_btn.setEnabled(False)
-        btn_layout.addWidget(self.run_btn)
-        btn_layout.addWidget(self.stop_btn)
-        right_layout.addLayout(btn_layout)
         
         splitter.setSizes([700, 500])
         self.update_options_state()
@@ -239,24 +254,33 @@ class MainWindow(QMainWindow):
             else:
                 xyz_path = fp
 
+            trajectory_data = ""
             if xyz_path and xyz_path.exists():
                 with open(xyz_path, 'r', encoding='utf-8') as f:
-                    data = f.read()
-                self.viewer_panel.load_trajectory(data)
+                    trajectory_data = f.read()
+                self.viewer_panel.load_trajectory(trajectory_data)
             elif fp.suffix.lower() != '.csv':
                 with open(fp, 'r', encoding='utf-8') as f:
-                    data = f.read()
-                self.viewer_panel.load_trajectory(data)
+                    trajectory_data = f.read()
+                self.viewer_panel.load_trajectory(trajectory_data)
 
             energies = []
+            saddle_flags = []
+            csv_rows = []
             if csv_path and csv_path.exists():
                 import csv
                 with open(csv_path, 'r', encoding='utf-8') as f:
                     reader = csv.reader(f)
                     for row in reader:
+                        csv_rows.append(row)
                         if not row or row[0].startswith('#') or row[0] in ['1d', '2d', 'concerted']:
                             continue
                         try:
+                            is_saddle = False
+                            if len(row) >= 6 and row[5].strip().lower() == 'true':
+                                is_saddle = True
+                            saddle_flags.append(is_saddle)
+                            
                             if len(row) >= 5 and row[4].replace('.', '', 1).replace('-', '', 1).isdigit():
                                 energies.append(float(row[4]))
                             elif len(row) >= 4:
@@ -270,11 +294,12 @@ class MainWindow(QMainWindow):
                         from core.config import HARTREE_TO_KCAL
                         e0 = energies_arr[0]
                         energies = [(e - e0) * HARTREE_TO_KCAL for e in energies_arr]
+                        saddle_flags = [False] * len(energies)
                 except Exception:
                     pass
 
-            if len(energies) > 0:
-                self.plot_widget.plot_energy(energies)
+            self.plot_widget.set_result_data(energies, saddle_flags, csv_rows, trajectory_data, file_path)
+            if len(energies) > 0 or trajectory_data:
                 self.tabs.setCurrentWidget(self.plot_widget)
         except Exception as e:
             self.log_text.append(f"<span style='color:red'>Failed to load result structure: {e}</span>")
@@ -301,7 +326,7 @@ class MainWindow(QMainWindow):
             "mult": self.mult_spin.value(),
             "method": self.method_combo.currentText(),
             "solvent": solvent,
-            "concerted": self.concerted_cb.isChecked(),
+            "concerted": self.tables_widget.is_concerted(),
             "scans": self.tables_widget.get_scans(),
             "constrains": self.tables_widget.get_constrains()
         }
@@ -318,7 +343,7 @@ class MainWindow(QMainWindow):
         self.process.finished.connect(self.process_finished)
         
         self.log_text.clear()
-        self.tabs.setCurrentIndex(2) # Switch to log tab
+        self.tabs.setCurrentIndex(1) # Switch to log tab
         
         # Command
         exe_path = sys.executable # Will use uv's python
@@ -356,14 +381,29 @@ class MainWindow(QMainWindow):
             scan_log = workdir / "xtbscan.log"
             opt_xyz = workdir / "xtbopt.xyz"
             
-            try:
-                if res_xyz.exists():
-                    self.load_result_file(str(res_xyz))
-                elif res_csv.exists():
-                    self.load_result_file(str(res_csv))
-                elif scan_log.exists():
-                    self.load_result_file(str(scan_log))
-                elif opt_xyz.exists():
-                    self.load_result_file(str(opt_xyz))
-            except Exception as e:
-                self.log_text.append(f"<span style='color:red'>Failed to load result structure: {e}</span>")
+            ans = QMessageBox.question(
+                self, "Calculation Finished",
+                "計算が正常に完了しました。結果ファイルをロードしますか？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if ans == QMessageBox.StandardButton.Yes:
+                try:
+                    if res_xyz.exists():
+                        self.load_result_file(str(res_xyz))
+                    elif res_csv.exists():
+                        self.load_result_file(str(res_csv))
+                    elif scan_log.exists():
+                        self.load_result_file(str(scan_log))
+                    elif opt_xyz.exists():
+                        self.load_result_file(str(opt_xyz))
+                except Exception as e:
+                    self.log_text.append(f"<span style='color:red'>Failed to load result structure: {e}</span>")
+
+    def closeEvent(self, event):
+        if hasattr(self, 'process') and self.process and self.process.state() == QProcess.ProcessState.Running:
+            self.process.kill()
+        if hasattr(self, 'viewer_panel') and self.viewer_panel:
+            self.viewer_panel.cleanup()
+        super().closeEvent(event)
+
