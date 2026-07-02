@@ -5,6 +5,8 @@ SPEC.MD
 SPEC.md
 references/
 *.md
+!README.md
+!README.MD
 
 # Python
 __pycache__/

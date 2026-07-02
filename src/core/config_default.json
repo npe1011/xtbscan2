@@ -2,5 +2,8 @@
     "XTB_BIN": "xtb",
     "XTB_PARAM_DIR": "",
     "UMA_PARAM_PATH": "uma-s-1p1.pt",
-    "UMA_USE_GPU": false
+    "UMA_USE_GPU": false,
+    "NUM_THREADS": 1,
+    "MEMORY_PER_THREAD": "500M",
+    "KEEP_LOG": 1
 }

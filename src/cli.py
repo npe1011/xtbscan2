@@ -49,6 +49,9 @@ def main():
     scans = job_data.get("scans", [])
     constrains = job_data.get("constrains", [])
     concerted = job_data.get("concerted", False)
+    cpus = int(job_data.get("cpus", config.get("NUM_THREADS", 1)))
+    memory = str(job_data.get("memory", config.get("MEMORY_PER_THREAD", "500M")))
+    keep_log_val = int(job_data.get("keep_log", config.get("KEEP_LOG", 1)))
     
     if engine == "xtb":
         method = job_data.get("method", "gfn2")
@@ -57,6 +60,9 @@ def main():
         if method in ["gfnff", "gxtb"]:
             solvent = None
             solvation = None
+
+        from core.xtb import setenv_xtb
+        setenv_xtb(num_threads=cpus, memory_per_thread=memory)
 
         xtb_params = XTBParams(
             method=method,
@@ -95,7 +101,7 @@ def main():
                 constrains=parsed_constrains,
                 force_constant=force_constant,
                 concerted=concerted,
-                keep_log=1
+                keep_log=keep_log_val
             )
             print("Calculation completed successfully.")
         except Exception as e:
@@ -129,6 +135,9 @@ def main():
             ))
             
         try:
+            from core.uma import setenv_uma
+            setenv_uma(num_threads=cpus, memory_per_thread=memory)
+
             device = "cuda" if config.UMA_USE_GPU else "cpu"
             model_path = Path(config.UMA_PARAM_PATH)
             calculator = get_uma_calculator(model_path, device)
@@ -141,7 +150,7 @@ def main():
                 scans=parsed_scans,
                 constrains=parsed_constrains,
                 concerted=concerted,
-                keep_log=1
+                keep_log=keep_log_val
             )
             print("Calculation completed successfully.")
         except Exception as e:

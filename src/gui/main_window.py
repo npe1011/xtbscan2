@@ -364,6 +364,17 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
 
+            loaded_xyz = bool(trajectory_data.strip())
+            loaded_csv = bool(csv_path and csv_path.exists() and (len(energies) > 0 or len(csv_rows) > 0))
+
+            if loaded_csv and loaded_xyz and csv_path and xyz_path:
+                other_name = xyz_path.name if fp == csv_path else csv_path.name
+                self.file_path_label.setText(f"Result: {fp} & {other_name}\n[Both CSV & XYZ Loaded]")
+            elif loaded_csv and not loaded_xyz:
+                self.file_path_label.setText(f"Result: {fp}\n[CSV Only - No 3D Trajectory]")
+            elif loaded_xyz and not loaded_csv:
+                self.file_path_label.setText(f"Result: {fp}\n[XYZ/Log Only - No CSV Data]")
+
             self.plot_widget.set_result_data(energies, saddle_flags, csv_rows, trajectory_data, file_path)
             if len(energies) > 0 or trajectory_data:
                 self.tabs.setCurrentWidget(self.plot_widget)
@@ -378,7 +389,8 @@ class MainWindow(QMainWindow):
             if has_traj:
                 details.append("3D trajectory")
             detail_str = f" [{', '.join(details)}]" if details else ""
-            msg = f"Successfully loaded result file: {Path(file_path).name}{detail_str}"
+            src_str = "CSV & XYZ" if (loaded_csv and loaded_xyz) else ("CSV only" if loaded_csv else "XYZ/Log only")
+            msg = f"Successfully loaded result ({src_str}): {Path(file_path).name}{detail_str}"
             self.log_text.append(f"<span style='color:#4C1D95'><b>{msg}</b></span>")
             self.statusBar().showMessage(msg, 5000)
         except Exception as e:
@@ -399,6 +411,7 @@ class MainWindow(QMainWindow):
         if not job_name:
             job_name = Path(self.current_input_file).stem + "_scan"
             
+        from core import config
         job_data = {
             "engine": self.engine_combo.currentText(),
             "input_file": str(self.current_input_file),
@@ -409,7 +422,10 @@ class MainWindow(QMainWindow):
             "solvent": solvent,
             "concerted": self.tables_widget.is_concerted(),
             "scans": self.tables_widget.get_scans(),
-            "constrains": self.tables_widget.get_constrains()
+            "constrains": self.tables_widget.get_constrains(),
+            "cpus": int(config.get("NUM_THREADS", 1)),
+            "memory": str(config.get("MEMORY_PER_THREAD", "500M")),
+            "keep_log": int(config.get("KEEP_LOG", 1))
         }
         
         # Write to temp json
@@ -503,7 +519,7 @@ class MainWindow(QMainWindow):
                         self.load_result_file(str(opt_xyz))
                 except Exception as e:
                     self.log_text.append(f"<span style='color:red'>Failed to load result structure: {e}</span>")
-                    QMessageBox.warning(self, "Load Error", f"Failed to load result structure:\n{e}")
+                    QMessageBox.warning(self, "Load Error", f"Failed to load result file:\n{e}\n\nPlease verify that the file format is valid and supported.")
 
     def closeEvent(self, event):
         if hasattr(self, 'process') and self.process and self.process.state() == QProcess.ProcessState.Running:

@@ -63,7 +63,7 @@ class ScanDialog(QDialog):
 
     def get_current_value(self):
         if self.current_coords is None:
-            QMessageBox.warning(self, "Warning", "No structure loaded.")
+            QMessageBox.warning(self, "Warning", "No initial structure loaded.\nPlease open or drop an initial structure file before getting current geometrical parameters.")
             return
         
         atoms_str = self.atoms_edit.text()
@@ -142,7 +142,7 @@ class ConstrainDialog(QDialog):
 
     def get_current_value(self):
         if self.current_coords is None:
-            QMessageBox.warning(self, "Warning", "No structure loaded.")
+            QMessageBox.warning(self, "Warning", "No initial structure loaded.\nPlease open or drop an initial structure file before getting current geometrical parameters.")
             return
         
         atoms_str = self.atoms_edit.text()
