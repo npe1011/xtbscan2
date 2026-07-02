@@ -1,4 +1,17 @@
 import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(line_buffering=True)
+
+import logging
+_old_log = logging.Logger._log
+def _suppress_noisy_log(self, level, msg, args, exc_info=None, extra=None, stack_info=False, stacklevel=1):
+    if isinstance(msg, str) and ("Redirects are currently not supported" in msg or "dataset_list" in msg):
+        return
+    return _old_log(self, level, msg, args, exc_info=exc_info, extra=extra, stack_info=stack_info, stacklevel=stacklevel)
+logging.Logger._log = _suppress_noisy_log
+
 import json
 import argparse
 from pathlib import Path

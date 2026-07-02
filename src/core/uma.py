@@ -31,6 +31,13 @@ def load_uma_modules():
     try:
         import warnings
         warnings.simplefilter('ignore')
+        import logging
+        _old_log = logging.Logger._log
+        def _suppress_noisy_log(self, level, msg, args, exc_info=None, extra=None, stack_info=False, stacklevel=1):
+            if isinstance(msg, str) and ("Redirects are currently not supported" in msg or "dataset_list" in msg):
+                return
+            return _old_log(self, level, msg, args, exc_info=exc_info, extra=extra, stack_info=stack_info, stacklevel=stacklevel)
+        logging.Logger._log = _suppress_noisy_log
         import ase
         from ase import Atoms
         from ase.units import Hartree

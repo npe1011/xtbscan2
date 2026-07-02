@@ -346,7 +346,7 @@ class MainWindow(QMainWindow):
         # Command
         exe_path = sys.executable # Will use uv's python
         cli_script = Path(__file__).parent.parent / "cli.py"
-        self.process.start(exe_path, [str(cli_script), json_path])
+        self.process.start(exe_path, ["-u", str(cli_script), json_path])
         
         self.run_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
@@ -358,11 +358,15 @@ class MainWindow(QMainWindow):
             
     def handle_stdout(self):
         data = self.process.readAllStandardOutput().data().decode('utf-8', errors='replace')
-        self.log_text.append(data.strip())
+        if data.strip():
+            self.log_text.append(data.strip())
+            self.log_text.ensureCursorVisible()
         
     def handle_stderr(self):
         data = self.process.readAllStandardError().data().decode('utf-8', errors='replace')
-        self.log_text.append(f"<span style='color:red'>{data.strip()}</span>")
+        if data.strip():
+            self.log_text.append(f"<span style='color:red'>{data.strip()}</span>")
+            self.log_text.ensureCursorVisible()
         
     def process_finished(self, exit_code, exit_status):
         self.run_btn.setEnabled(True)
