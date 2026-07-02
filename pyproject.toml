@@ -1,0 +1,27 @@
+[project]
+name = "xtbscan2"
+version = "0.1.0"
+description = "GUI tool for structural optimization and scan calculations using xtb or fairchem-core."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Tatsuhiko Yoshino" }
+]
+dependencies = [
+    "fairchem-core",
+    "torch",
+    "ase",
+    "pyside6>=6.11.1",
+    "numpy",
+    "scipy",
+    "cclib",
+    "matplotlib"
+]
+
+[dependency-groups]
+dev = [
+    "pytest"
+]
+
+[tool.uv]
+compile-bytecode = true
