@@ -1,4 +1,5 @@
 import os
+import uuid
 from pathlib import Path
 import numpy as np
 from typing import Tuple, List
@@ -71,14 +72,25 @@ def parse_initial_structure(file: Path) -> Tuple[np.ndarray, np.ndarray]:
         atoms = np.array([ATOM_LIST[n] for n in data.atomnos])
         return atoms, coordinates
 
-def ensure_xyz(file: Path, out_dir: Path) -> Path:
+def ensure_xyz(file: Path, out_dir: Path, job_name: str = "job") -> Path:
     """
-    Parses the given file and writes an xyz file to out_dir / init.xyz.
+    Parses the given file and writes a unique temporary xyz file to out_dir.
     Returns the path to the newly created xyz file.
     """
     file = Path(file).absolute()
+    out_dir = Path(out_dir).absolute()
+    
+    # Clean up old legacy init.xyz if it exists
+    old_init = out_dir / 'init.xyz'
+    if old_init.exists():
+        try:
+            old_init.unlink()
+        except Exception:
+            pass
+
     atoms, coords = parse_initial_structure(file)
-    out_file = Path(out_dir) / 'init.xyz'
+    unique_id = uuid.uuid4().hex[:8]
+    out_file = out_dir / f"_tmp_init_{job_name}_{unique_id}.xyz"
     xyzutils.save_xyz_file(out_file, atoms, coords, f'Extracted from {file.name}')
     return out_file
 

@@ -126,9 +126,13 @@ class MainWindow(QMainWindow):
         self.charge_spin.setRange(-10, 10)
         form2.addRow("Charge", self.charge_spin)
         
-        self.mult_spin = QSpinBox()
-        self.mult_spin.setRange(1, 10)
-        form2.addRow("Multiplicity", self.mult_spin)
+        self.mult_combo = QComboBox()
+        self.mult_combo.addItem("1 (Singlet / Restricted)", "1_restricted")
+        self.mult_combo.addItem("1 (Singlet / Unrestricted, --uhf 0)", "1_unrestricted")
+        for m in range(2, 11):
+            names = {2: "Doublet", 3: "Triplet", 4: "Quartet", 5: "Quintet", 6: "Sextet", 7: "Septet", 8: "Octet", 9: "Nonet", 10: "Decet"}
+            self.mult_combo.addItem(f"{m} ({names.get(m, '')})", str(m))
+        form2.addRow("Multiplicity", self.mult_combo)
         
         settings_layout.addLayout(form2)
         calc_layout.addLayout(settings_layout)
@@ -412,12 +416,21 @@ class MainWindow(QMainWindow):
             job_name = Path(self.current_input_file).stem + "_scan"
             
         from core import config
+        mult_data = self.mult_combo.currentData()
+        if mult_data in ["1_restricted", "1_unrestricted"]:
+            mult_val = 1
+            mult_mode = mult_data
+        else:
+            mult_val = int(mult_data) if mult_data else 1
+            mult_mode = str(mult_data)
+
         job_data = {
             "engine": self.engine_combo.currentText(),
             "input_file": str(self.current_input_file),
             "job_name": job_name,
             "charge": self.charge_spin.value(),
-            "mult": self.mult_spin.value(),
+            "mult": mult_val,
+            "mult_mode": mult_mode,
             "method": self.method_combo.currentText(),
             "solvent": solvent,
             "concerted": self.tables_widget.is_concerted(),
@@ -454,7 +467,7 @@ class MainWindow(QMainWindow):
         self.run_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         
-    def cleanup_temp_json(self):
+    def cleanup_temp_files(self):
         if hasattr(self, '_temp_json_path') and self._temp_json_path:
             try:
                 if os.path.exists(self._temp_json_path):
@@ -462,13 +475,24 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self._temp_json_path = None
+            
+        if hasattr(self, 'current_input_file') and self.current_input_file:
+            try:
+                workdir = Path(self.current_input_file).parent
+                for tmp_file in workdir.glob("_tmp_init_*.xyz"):
+                    try:
+                        tmp_file.unlink()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     def stop_calculation(self):
         if self.process and self.process.state() == QProcess.ProcessState.Running:
             self._user_stopped = True
             self.process.kill()
             self.log_text.append("\nCalculation stopped by user.")
-        self.cleanup_temp_json()
+        self.cleanup_temp_files()
             
     def handle_stdout(self):
         data = self.process.readAllStandardOutput().data().decode('utf-8', errors='replace')
@@ -483,7 +507,7 @@ class MainWindow(QMainWindow):
             self.log_text.ensureCursorVisible()
         
     def process_finished(self, exit_code, exit_status):
-        self.cleanup_temp_json()
+        self.cleanup_temp_files()
         if not getattr(self, 'is_result_loaded', False):
             self.run_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)

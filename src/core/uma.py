@@ -896,7 +896,7 @@ def _scan_concerted(input_xyz_file: Path,
 
 
 def setenv_uma(num_threads: int = 1, memory_per_thread: Optional[str] = None) -> None:
-    if not IS_UMA_VALID:
+    if not load_uma_modules():
         raise RuntimeError('Import of ASE/torch/fairchem-core failed.')
     assert int(num_threads) > 0
     num_threads = int(num_threads)

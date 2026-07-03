@@ -24,14 +24,15 @@ class XTBParams:
     def __init__(self,
                  method: str = 'gxtb',
                  charge: int = 0,
-                 uhf: int = 0,
+                 uhf: Optional[int] = None,
                  solvation: Optional[str] = None,
                  solvent: Optional[str] = None):
         # check parameters
         try:
             method = method.lower()
             assert method in ['gfn1', 'gfn2', 'gfnff', 'gxtb']
-            assert uhf >= 0
+            if uhf is not None:
+                assert uhf >= 0
             if solvation is not None:
                 solvation = solvation.lower()
                 assert solvation in ['alpb', 'gbsa', 'cosmo', 'gbe']
@@ -48,7 +49,9 @@ class XTBParams:
 
     @property
     def args(self) -> List[str]:
-        _args = ['--' + self.method, '--chrg', str(self.charge), '--uhf', str(self.uhf)]
+        _args = ['--' + self.method, '--chrg', str(self.charge)]
+        if self.uhf is not None:
+            _args.extend(['--uhf', str(self.uhf)])
         if self.solvation is not None:
             _args.extend(['--' + self.solvation, self.solvent])
         return _args
